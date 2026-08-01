@@ -3,7 +3,7 @@ name: Build Job
 on:
   push:
     branches:
-      - master
+      - main
   workflow_dispatch:
 
 permissions:
@@ -19,7 +19,7 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::830663695860:role/github-actions-dotnet-role
+          role-to-assume: ${{ secrets.IAM_ROLE_ARN }}
           aws-region: us-east-1
       - name: Login to Amazon ECR
         id: login-ecr
