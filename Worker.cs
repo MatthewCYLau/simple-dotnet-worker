@@ -9,17 +9,21 @@ public class Worker : BackgroundService
     private readonly IAmazonS3 _s3Client;
     private readonly IHostApplicationLifetime _lifetime;
     private readonly IConfiguration _configuration;
+    private readonly IDynamoDbRepository _repository;
 
     public Worker(
         ILogger<Worker> logger,
         IAmazonS3 s3Client,
         IHostApplicationLifetime lifetime,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IDynamoDbRepository repository
+        )
     {
         _logger = logger;
         _s3Client = s3Client;
         _lifetime = lifetime;
         _configuration = configuration;
+        _repository = repository;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -48,6 +52,16 @@ public class Worker : BackgroundService
             }
 
             _logger.LogInformation("Task completed successfully.");
+
+            var items = await _repository.GetAllItemsAsync("stock_trading_positions", stoppingToken);
+            _logger.LogInformation("Fetched {Count} positions.", items.Count);
+
+            foreach (var item in items)
+            {
+                string positionId = item["PositionId"].S;
+                decimal value = decimal.Parse(item["Value"].N);
+                _logger.LogInformation($"Position Id: {positionId} Value: {value}");
+            }
         }
         catch (AmazonS3Exception ex)
         {
