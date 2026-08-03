@@ -1,5 +1,6 @@
 using Amazon.DynamoDBv2;
 using simple_dotnet_worker;
+using Amazon;
 
 var builder = Host.CreateApplicationBuilder(args);
 
@@ -9,6 +10,13 @@ builder.Services.AddAWSService<Amazon.S3.IAmazonS3>();
 
 builder.Services.AddAWSService<IAmazonDynamoDB>();
 builder.Services.AddSingleton<IDynamoDbRepository, DynamoDbRepository>();
+
+builder.Services.AddKeyedSingleton("PositionsPnLAggregate", (sp, key) =>
+{
+    var options = builder.Configuration.GetAWSOptions();
+    options.Region = RegionEndpoint.USEast1;
+    return options.CreateServiceClient<IAmazonDynamoDB>();
+});
 
 // Register background task
 builder.Services.AddHostedService<Worker>();

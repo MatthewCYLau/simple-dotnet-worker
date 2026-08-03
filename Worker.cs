@@ -1,3 +1,5 @@
+using Amazon.DynamoDBv2;
+using Amazon.DynamoDBv2.Model;
 using Amazon.S3;
 using Amazon.S3.Model;
 
@@ -10,13 +12,15 @@ public class Worker : BackgroundService
     private readonly IHostApplicationLifetime _lifetime;
     private readonly IConfiguration _configuration;
     private readonly IDynamoDbRepository _repository;
+    private readonly IAmazonDynamoDB _positionsPnLAggregateDynamo;
 
     public Worker(
         ILogger<Worker> logger,
         IAmazonS3 s3Client,
         IHostApplicationLifetime lifetime,
         IConfiguration configuration,
-        IDynamoDbRepository repository
+        IDynamoDbRepository repository,
+        [FromKeyedServices("PositionsPnLAggregate")] IAmazonDynamoDB positionsPnLAggregateDynamo
         )
     {
         _logger = logger;
@@ -24,6 +28,7 @@ public class Worker : BackgroundService
         _lifetime = lifetime;
         _configuration = configuration;
         _repository = repository;
+        _positionsPnLAggregateDynamo = positionsPnLAggregateDynamo;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -62,6 +67,35 @@ public class Worker : BackgroundService
                 decimal value = decimal.Parse(item["Value"].N);
                 _logger.LogInformation($"Position Id: {positionId} Value: {value}");
             }
+
+            var allItems = new List<Dictionary<string, AttributeValue>>();
+            Dictionary<string, AttributeValue>? lastEvaluatedKey = null;
+
+            do
+            {
+                var scanRequest = new ScanRequest
+                {
+                    TableName = "positions_pnl_aggregate",
+                    ExclusiveStartKey = lastEvaluatedKey,
+                };
+
+                ScanResponse positionsPnLResponse = await _positionsPnLAggregateDynamo.ScanAsync(scanRequest, stoppingToken);
+
+                // Add current page of items to master list
+                allItems.AddRange(positionsPnLResponse.Items);
+
+                // If LastEvaluatedKey is null or empty, we've read the whole table
+                lastEvaluatedKey = positionsPnLResponse.LastEvaluatedKey;
+
+            } while (lastEvaluatedKey != null && lastEvaluatedKey.Count > 0);
+
+            foreach (var item in allItems)
+            {
+                string positionId = item["PositionId"].S;
+                decimal totalPnL = decimal.Parse(item["TotalPnL"].N);
+                _logger.LogInformation($"Position Id from PnL Aggregation DynamoDB: {positionId} Total PnL: {totalPnL}");
+            }
+
         }
         catch (AmazonS3Exception ex)
         {
