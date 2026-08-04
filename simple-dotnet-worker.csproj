@@ -12,6 +12,7 @@
     <PackageReference Include="AWSSDK.DynamoDBv2" Version="4.0.102.1" />
     <PackageReference Include="AWSSDK.Extensions.NETCore.Setup" Version="4.0.100.7" />
     <PackageReference Include="AWSSDK.S3" Version="4.0.101.6" />
+    <PackageReference Include="AWSSDK.SQS" Version="4.0.100.7" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
   </ItemGroup>
 </Project>

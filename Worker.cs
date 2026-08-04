@@ -2,6 +2,8 @@ using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
 using Amazon.S3;
 using Amazon.S3.Model;
+using Amazon.SQS;
+using Amazon.SQS.Model;
 
 namespace simple_dotnet_worker;
 
@@ -13,6 +15,9 @@ public class Worker : BackgroundService
     private readonly IConfiguration _configuration;
     private readonly IDynamoDbRepository _repository;
     private readonly IAmazonDynamoDB _positionsPnLAggregateDynamo;
+    private readonly IAmazonSQS _sqsClient;
+
+    private const string QueueUrl = "https://sqs.us-east-1.amazonaws.com/830663695860/aws-app-task-queue";
 
     public Worker(
         ILogger<Worker> logger,
@@ -20,7 +25,8 @@ public class Worker : BackgroundService
         IHostApplicationLifetime lifetime,
         IConfiguration configuration,
         IDynamoDbRepository repository,
-        [FromKeyedServices("PositionsPnLAggregate")] IAmazonDynamoDB positionsPnLAggregateDynamo
+        [FromKeyedServices("PositionsPnLAggregate")] IAmazonDynamoDB positionsPnLAggregateDynamo,
+        IAmazonSQS sqsClient
         )
     {
         _logger = logger;
@@ -29,6 +35,7 @@ public class Worker : BackgroundService
         _configuration = configuration;
         _repository = repository;
         _positionsPnLAggregateDynamo = positionsPnLAggregateDynamo;
+        _sqsClient = sqsClient;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -96,7 +103,22 @@ public class Worker : BackgroundService
                 _logger.LogInformation($"Position Id from PnL Aggregation DynamoDB: {positionId} Total PnL: {totalPnL}");
             }
 
+            var receiveRequest = new ReceiveMessageRequest
+            {
+                QueueUrl = QueueUrl,
+                MaxNumberOfMessages = 5,
+                WaitTimeSeconds = 5
+            };
+
+            var sqsResponse = await _sqsClient.ReceiveMessageAsync(receiveRequest, stoppingToken);
+            foreach (var message in sqsResponse.Messages ?? Enumerable.Empty<Message>())
+            {
+                _logger.LogInformation($"Messages count: {sqsResponse.Messages.Count}");
+                _logger.LogInformation(message.Body);
+            }
         }
+
+
         catch (AmazonS3Exception ex)
         {
             _logger.LogError(ex, "AWS S3 Error encountered: {Message}", ex.Message);
