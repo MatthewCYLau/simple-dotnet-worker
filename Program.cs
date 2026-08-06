@@ -23,6 +23,7 @@ builder.Services.AddAWSService<IAmazonSQS>();
 
 // Register background task
 builder.Services.AddHostedService<Worker>();
+builder.Services.AddHostedService<SqsQueueWorker>();
 
 var host = builder.Build();
 await host.RunAsync();

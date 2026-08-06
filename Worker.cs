@@ -17,8 +17,6 @@ public class Worker : BackgroundService
     private readonly IAmazonDynamoDB _positionsPnLAggregateDynamo;
     private readonly IAmazonSQS _sqsClient;
 
-    private const string QueueUrl = "https://sqs.us-east-1.amazonaws.com/830663695860/aws-app-task-queue";
-
     public Worker(
         ILogger<Worker> logger,
         IAmazonS3 s3Client,
@@ -102,20 +100,6 @@ public class Worker : BackgroundService
                 decimal totalPnL = decimal.Parse(item["TotalPnL"].N);
                 _logger.LogInformation($"Position Id from PnL Aggregation DynamoDB: {positionId} Total PnL: {totalPnL}");
             }
-
-            var receiveRequest = new ReceiveMessageRequest
-            {
-                QueueUrl = QueueUrl,
-                MaxNumberOfMessages = 5,
-                WaitTimeSeconds = 5
-            };
-
-            var sqsResponse = await _sqsClient.ReceiveMessageAsync(receiveRequest, stoppingToken);
-            foreach (var message in sqsResponse.Messages ?? Enumerable.Empty<Message>())
-            {
-                _logger.LogInformation($"Messages count: {sqsResponse.Messages.Count}");
-                _logger.LogInformation(message.Body);
-            }
         }
 
 
@@ -132,7 +116,7 @@ public class Worker : BackgroundService
         finally
         {
             // Signal the generic host to shut down so the K8s Job pod exits gracefully
-            _lifetime.StopApplication();
+            // _lifetime.StopApplication();
         }
     }
 }
